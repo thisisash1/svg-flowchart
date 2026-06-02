@@ -1,0 +1,14 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Generated outputs (SVG + 기획 MD는 로컬 생성물, git에서 제외)
+outputs/*.svg
+outputs/*.md
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
