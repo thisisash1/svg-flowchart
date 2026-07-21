@@ -11,6 +11,9 @@ Claude Code 스킬 기반으로 **Figma에 바로 import 가능한 SVG 플로우
 |------|------|
 | [`outputs/parcel-tracking-system.svg`](outputs/parcel-tracking-system.svg) | 택배 조회 시스템 전체 아키텍처 플로우 |
 | [`outputs/finance-transfer-flow.svg`](outputs/finance-transfer-flow.svg) | 금융 송금 서비스 플로우 |
+| [`outputs/haezum-power-flow.svg`](outputs/haezum-power-flow.svg) | 해줌 태양광 발전량 조회 서비스 플로우 |
+| [`outputs/re100-roadmap-flow.svg`](outputs/re100-roadmap-flow.svg) | RE100 달성 로드맵 의사결정 플로우 |
+| [`outputs/sns-architecture.svg`](outputs/sns-architecture.svg) | SNS 플랫폼 시스템 아키텍처 (21노드 이상, 레이어별 분할 처리) |
 
 ---
 
@@ -27,6 +30,7 @@ Claude Code가 설치된 환경에서 아래처럼 요청하면 스킬이 자동
 - `플로우차트 만들어줘` / `다이어그램 그려줘`
 - `서비스 플로우 설계해줘` / `피그마용 SVG`
 - `유저 플로우` / `시스템 아키텍처` / `의사결정 흐름`
+- `조직도` / `OKR 로드맵` / `process diagram` / `roadmap`
 - 기존 플로우차트 수정/업데이트 요청 시도 자동 트리거
 
 출력 파일은 항상 `outputs/` 폴더에 `.svg` + `.md` 쌍으로 저장됩니다.
@@ -51,7 +55,16 @@ SVG를 만들기 전에 플로우의 빈틈을 찾습니다.
 
 > SVG 코드를 한 줄도 작성하기 전에 완료해야 합니다.
 
-모든 노드의 좌표를 테이블로 계산하고, 5가지 충돌 규칙을 검증합니다.
+**0.5-0. 복잡도 게이트** — 총 노드 수에 따라 처리 방식을 자동 분기합니다:
+
+| 노드 수 | 처리 방식 |
+|---------|----------|
+| **≤ 20노드** | 통합 레지스트리 방식 (전체 좌표를 한 번에 계산) |
+| **≥ 21노드** | **레이어별 분할 처리** (최대 8노드 단위로 분할 → API 타임아웃 방지) |
+
+**레이어별 분할 처리 (21노드 이상)**: 전체 좌표를 한 번에 계산하면 모델 thinking token이 10만개+ 소모되어 세션이 종료됩니다. 레이어(Layer) 단위로 쪼개어 각 단위를 4~8노드로 줄인 뒤, SVG 파일에 `cat >>` 로 누적 저장합니다.
+
+**통합 레지스트리 방식 (20노드 이하)**: 모든 노드의 좌표를 테이블로 계산하고, 5가지 충돌 규칙을 검증합니다.
 
 | Rule | 검증 내용 |
 |------|-----------|
@@ -66,6 +79,9 @@ SVG를 만들기 전에 플로우의 빈틈을 찾습니다.
 ### Phase 1 — SVG 제작
 
 레지스트리 좌표만 사용해서 SVG를 생성합니다.
+- **20노드 이하**: 전체 SVG를 한 번에 파일로 저장
+- **21노드 이상**: Phase 0.5-L에서 이미 누적 저장 완료 → 기획 MD만 추가 저장
+
 생성 후 동일한 파일명으로 `.md` 기획 명세도 함께 저장합니다.
 
 ---
@@ -81,10 +97,17 @@ SVG를 만들기 전에 플로우의 빈틈을 찾습니다.
 │   ├── parcel-tracking-system.svg
 │   ├── parcel-tracking-system.md
 │   ├── finance-transfer-flow.svg
-│   └── finance-transfer-flow.md
+│   ├── finance-transfer-flow.md
+│   ├── haezum-power-flow.svg
+│   ├── haezum-power-flow.md
+│   ├── re100-roadmap-flow.svg
+│   ├── re100-roadmap-flow.md
+│   ├── sns-architecture.svg
+│   └── sns-architecture.md
 ├── references/
 │   ├── color-tokens.md               # 노드 타입별 컬러 스펙
-│   └── componet-examples.md          # SVG 컴포넌트 스니펫
+│   ├── componet-examples.md          # SVG 컴포넌트 스니펫
+│   └── layout-guide.md              # 레이아웃 패턴 + 간격 공식
 └── README.md
 ```
 
@@ -108,10 +131,12 @@ SVG를 만들기 전에 플로우의 빈틈을 찾습니다.
 
 | 패턴 | 캔버스 | 적용 상황 |
 |------|--------|-----------|
-| **세로형** | 1800 × 2400~4000 | 사용자 여정, 결제, 로그인 플로우 |
+| **세로형** | 1800 × 3200~4000 | 사용자 여정, 결제, 로그인 플로우 |
 | **가로형** | 3200~4800 × 1400 | 시스템 아키텍처, API 데이터 플로우 |
 | **스윔레인** | 2400~3600 × 1800~2400 | 역할별 책임 분리 다이어그램 |
 | **혼합형** | 2400 × 2400~3200 | 의사결정 트리, 복잡한 분기 구조 |
+
+레이아웃 선택 기준 및 간격 공식은 `references/layout-guide.md` 참조.
 
 ### 주요 컴포넌트
 
@@ -148,9 +173,10 @@ ah-amber  #D97706  조건부 분기 경로
 `.claude/commands/figma-svg-flowchart.md`를 수정해서 스킬을 확장할 수 있습니다.
 
 - **새 노드 타입 추가**: `references/color-tokens.md`에 컬러 스펙 추가 후 스킬에 패턴 등록
-- **레이아웃 패턴 추가**: Phase 1 레이아웃 가이드 섹션에 새 패턴 정의
+- **레이아웃 패턴 추가**: `references/layout-guide.md`에 새 패턴 정의
 - **Phase 0 질문 커스텀**: Round 3 갭 탐지 체크리스트 항목 추가/수정
 - **Phase 0.5 검증 규칙 추가**: 충돌 검증 Rule 추가
+- **복잡도 게이트 기준 변경**: Phase 0.5-0의 노드 수 임계값(현재 21) 조정
 
 ---
 
@@ -158,5 +184,6 @@ ah-amber  #D97706  조건부 분기 경로
 
 | 날짜 | 버전 | 내용 |
 |------|------|------|
+| 2026-07-21 | v3 | Phase 0.5-0 복잡도 게이트 신설 (≤20 통합 / ≥21 레이어별 분할), Phase 0.5-L 레이어별 분할 처리 신설, references/layout-guide.md 분리, 데모 파일 3개 추가 |
 | 2026-06-02 | v2 | Phase 0.5 신설 (좌표 레지스트리 + 5가지 충돌 검증 규칙) |
 | 2026-05-29 | v1 | figma-svg-flowchart 스킬 최초 작성, 첫 플로우차트 생성 |
